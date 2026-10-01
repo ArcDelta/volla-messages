@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# This wrapper is kept for future reference if required, but it should be replaced completely by the launcher.
+
 export APPDIR="/opt/click.ubuntu.com/volla-messages.volla/current"
 
 if [ -n "$VOLLA_LAUNCHED" ]; then
