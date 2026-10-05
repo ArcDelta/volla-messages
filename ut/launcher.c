@@ -59,8 +59,15 @@ int main(int argc, char **argv)
 	setenv("SDL_VIDEODRIVER", "wayland", 1);
 	setenv("SDL_AUDIODRIVER", "pulseaudio", 1);
 	setenv("HAS_DESKTOP_ENVIRONMENT", "0", 1);
+	/* webkit's bwrap sandbox runs /usr/bin/xdg-dbus-proxy, which the
+	 * image doesn't ship */
+	setenv("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS", "1", 1);
 	snprintf(buf, sizeof(buf), "%s/lib", root);
 	setenv("LD_LIBRARY_PATH", buf, 1);
+	const char *preload = getenv("LD_PRELOAD");
+	snprintf(buf, sizeof(buf), "%s%s%s/lib/webkit_zoom_hook.so:%s/lib/gtk_nocsd_hook.so",
+			preload ? preload : "", preload ? ":" : "", root, root);
+	setenv("LD_PRELOAD", buf, 1);
 
 	/* confinement only allows the app-scoped XDG subdirs */
 	const char *home = getenv("HOME");
@@ -70,11 +77,29 @@ int main(int argc, char **argv)
 		scoped_xdg("XDG_DATA_HOME", home, ".local/share");
 	}
 
+	/* the session presets GTK_IM_MODULE=maliit, but the gtk module
+	 * registers its context as Maliit */
+	const char *cache = getenv("XDG_CACHE_HOME");
+	if (cache) {
+		snprintf(buf, sizeof(buf), "%s/immodules.cache", cache);
+		FILE *f = fopen(buf, "w");
+		if (f) {
+			fprintf(f, "\"%s/lib/gtk-3.0/3.0.0/immodules/im-maliit.so\"\n"
+					"\"Maliit\" \"Maliit Input Method\" \"maliit\" \"\" \"*\"\n",
+					root);
+			fclose(f);
+			setenv("GTK_IM_MODULE_FILE", buf, 1);
+			setenv("GTK_IM_MODULE", "Maliit", 1);
+		}
+	}
+
 	pid_t pid = fork();
 	if (pid == 0)
 		hold_display_on();
 
-	snprintf(buf, sizeof(buf), "%s/lib/volla-messages", root);
+	if (chdir(root))
+		return 1;
+	snprintf(buf, sizeof(buf), "%s/lib/volla_messages", root);
 	argv[0] = buf;
 	execv(buf, argv);
 	return 1;
