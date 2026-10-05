@@ -1,35 +1,55 @@
 #!/bin/bash
-
 # Assemble a click package for Ubuntu Touch from a previously built Volla Messages deb.
 # A previously set up environment with all the dependencies for click packaging is required.
-
-# TODO:
-# - Full testing and clean up required.
-# - Integrate the webkit zoom hook provided as patch, because I have no idea how to apply it besides compiling the C code.
-# - The original script pulls libraries, pressumably to fix issues. For now, this tests if it's really required.
-
-set -e
+#
+# Layout of the click:
+#   volla-messages-launcher   sets up the environment and execs lib/volla_messages
+#   lib/                      the app, the libraries the stock image lacks, and the hooks
+#   lib/webkit2gtk-4.1/       webkit's helper processes
+set -ex
 
 DEB=$1
 
-[ -f "$DEB" ] || { echo "usage: $0 Volla.Messages_*_amd64.deb"; exit 1; }
+[ -f "$DEB" ] || { echo "usage: $0 Volla.Messages_*.deb"; exit 1; }
 
+ARCH=${ARCH:-$(dpkg --print-architecture)}
+TRIPLET=$(dpkg-architecture -a"$ARCH" -qDEB_HOST_MULTIARCH)
 HERE=$(dirname "$(readlink -f "$0")")
 OUT=$(pwd)
-R=$(mktemp -d)
-S=$R/stage
-B=$R/click
-dpkg-deb -x "$DEB" "$S"
-cd "$R"
+WORK=$(mktemp -d)
+STAGE=$WORK/stage
+CLICK=$WORK/click
 
-## This definitely serves a purpose in the original script, and I have yet to understand what our equivalent is.
-#for d in *.deb; do dpkg-deb -x "$d" "$S"; done
-#A=$S/usr/lib/
-#cp -a "$A"/placeholder/. "$B/lib/"
-#cp -a "$A"/libSDL2_ttf-2.0.so.0* "$A"/libswscale.so.7* \
-cp "$S"/usr/share/icons/hicolor/116x116/apps/volla_messages.png "$B/volla_messages.png"
-cp "$HERE"/manifest.json "$HERE"/volla-messages.apparmor "$HERE"/volla-messages.desktop "$B/"
-gcc -O2 -o "$B/volla-messages-launcher" "$HERE/launcher.c" $(pkg-config --cflags --libs gio-2.0)
-click build "$B"
-mv "$R"/*.click "$OUT"/
-rm -rf "$R"
+dpkg-deb -x "$DEB" "$STAGE"
+cd "$WORK"
+
+# The app and its libraries. The maliit gtk module gives GTK the on-screen keyboard.
+mkdir -p "$CLICK/lib"
+cp "$STAGE"/usr/bin/volla_messages "$CLICK/lib/"
+"$HERE"/bundle-deps.sh "$CLICK/lib/volla_messages" "$CLICK/lib" maliit-inputcontext-gtk3
+
+# Webkit runs its helper processes from a directory hardcoded at build time.
+# Rewrite it to the bundled copy, relative to the app root the launcher chdirs
+# to. The new path is padded with slashes to the same length, so the library
+# layout stays intact.
+WEBKIT_DIR=/usr/lib/$TRIPLET/webkit2gtk-4.1
+BUNDLED_DIR=lib/webkit2gtk-4.1
+while [ ${#BUNDLED_DIR} -lt ${#WEBKIT_DIR} ]; do
+    BUNDLED_DIR=${BUNDLED_DIR%%/*}//${BUNDLED_DIR#*/}
+done
+sed -i --follow-symlinks "s|$WEBKIT_DIR|$BUNDLED_DIR|g" "$CLICK"/lib/libwebkit2gtk-4.1.so.0
+
+# Click metadata
+cp "$STAGE"/usr/share/icons/hicolor/128x128/apps/volla_messages.png "$CLICK/volla_messages.png"
+cp "$HERE"/manifest.json "$HERE"/volla-messages.apparmor "$HERE"/volla-messages.desktop "$CLICK/"
+sed -i "s/@CLICK_ARCH@/$ARCH/g" "$CLICK"/manifest.json
+
+# The launcher and the hooks it preloads: page zoom from the grid unit, and no titlebar
+gcc -O2 -o "$CLICK/volla-messages-launcher" "$HERE/launcher.c" $(pkg-config --cflags --libs gio-2.0)
+gcc -O2 -shared -fPIC -o "$CLICK/lib/webkit_zoom_hook.so" "$HERE/patches/webkit_zoom_hook.c" -ldl
+gcc -O2 -shared -fPIC -o "$CLICK/lib/gtk_nocsd_hook.so" "$HERE/patches/gtk_nocsd_hook.c" -ldl
+
+click build "$CLICK"
+
+mv "$WORK"/*.click "$OUT"/
+rm -rf "$WORK"
