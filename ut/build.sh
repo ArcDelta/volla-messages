@@ -8,7 +8,7 @@
 #   lib/webkit2gtk-4.1/       webkit's helper processes
 set -ex
 
-APPIMAGE=$1
+APPIMAGE=$(readlink -f "$1")
 
 [ -f "$APPIMAGE" ] || { echo "usage: $0 Volla.Messages_*.AppImage"; exit 1; }
 

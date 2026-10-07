@@ -517,16 +517,15 @@ jobs:
           - arch: aarch64
             runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            container: null
+            container: ubuntu:24.04
 
     steps:
       - uses: actions/checkout@v3
 
       - name: Install packages
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -y dpkg-dev pipx apt-file binutils
-          pipx install clickable-ut
+          apt-get update -q
+          apt-get install -y dpkg-dev apt-file binutils click gcc libglib2.0-dev pkg-config
 
       - name: Download ${{ matrix.arch }} AppImage
         uses: actions/download-artifact@v4
@@ -537,15 +536,15 @@ jobs:
       - name: Build click package
         working-directory: ut
         run: |
-          VERSION="${{ github.ref_name }}"
-          sed -i "s/^\"version\": \".*\"/\"version\": \"'${VERSION}'"/" ut/manifest.json
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i "s/@VERSION@/${VERSION}/" manifest.json
           ARCH="${{ matrix.arch }}"
           [ "${{ matrix.arch }}" = "x86_64" ] && ARCH="amd64"
-          ./build.sh "Volla Messages_${VERSION}_${ARCH}.AppImage"
+          ./build.sh Volla\ Messages_*_${ARCH}.AppImage
 
       - name: Upload click to release
         uses: AButler/upload-release-assets@v3.0
         with:
-          files: "ut/build/${{ matrix.arch }}-linux-gnu/app/*.click"
+          files: "ut/volla-messages.volla_*.click"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           release-id: ${{ needs.create-release.outputs.releaseId }}
