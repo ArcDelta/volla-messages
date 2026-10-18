@@ -207,11 +207,11 @@ jobs:
           releaseId: ${{ needs.create-release.outputs.releaseId }}
           args: --verbose --features holochain_bundled --target ${{ matrix.target }}
 
-      - name: Upload ${{ matrix.arch }} AppImage for Ubuntu Touch job
+      - name: Upload ${{ matrix.arch }} deb for Ubuntu Touch job
         uses: actions/upload-artifact@v4
         with:
-          name: volla-messages-appimage-${{ matrix.arch }}
-          path: src-tauri/target/${{ matrix.target }}/release/bundle/appimage/Volla Messages_*.AppImage
+          name: volla-messages-deb-${{ matrix.arch }}
+          path: src-tauri/target/${{ matrix.target }}/release/bundle/deb/Volla Messages_*.deb
           retention-days: 1
 
   release-tauri-app-android:
@@ -528,17 +528,17 @@ jobs:
           apt-get install -y pipx
           pipx install clickable-ut
 
-      - name: Download ${{ matrix.arch }} AppImage
+      - name: Download ${{ matrix.arch }} deb file
         uses: actions/download-artifact@v4
         with:
-          name: volla-messages-appimage-${{ matrix.arch }}
+          name: volla-messages-deb-${{ matrix.arch }}
           path: ut/
 
       - name: Build click package
         working-directory: ut
         run: |
           sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${GITHUB_REF_NAME#v}\"/" manifest.json
-          /root/.local/bin/clickable build --container-mode
+          $HOME/.local/bin/clickable build --container-mode
 
       - name: Upload click to release
         uses: AButler/upload-release-assets@v3.0
