@@ -525,7 +525,8 @@ jobs:
       - name: Install packages
         run: |
           apt-get update -q
-          apt-get install -y dpkg-dev apt-file binutils click gcc libglib2.0-dev pkg-config
+          apt-get install -y pipx
+          pipx install clickable-ut
 
       - name: Download ${{ matrix.arch }} AppImage
         uses: actions/download-artifact@v4
@@ -536,15 +537,12 @@ jobs:
       - name: Build click package
         working-directory: ut
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          sed -i "s/@VERSION@/${VERSION}/" manifest.json
-          ARCH="${{ matrix.arch }}"
-          [ "${{ matrix.arch }}" = "x86_64" ] && ARCH="amd64"
-          ./build.sh Volla\ Messages_*_${ARCH}.AppImage
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${GITHUB_REF_NAME#v}\"/" manifest.json
+          /root/.local/bin/clickable build --container-mode
 
       - name: Upload click to release
         uses: AButler/upload-release-assets@v3.0
         with:
-          files: "ut/volla-messages.volla_*.click"
+          files: "ut/build/*/app/volla-messages.volla_*.click"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           release-id: ${{ needs.create-release.outputs.releaseId }}
