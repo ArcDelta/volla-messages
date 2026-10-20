@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <string.h>
 
 static void scoped_xdg(const char *var, const char *home, const char *sub)
 {
@@ -59,6 +60,22 @@ int main(int argc, char **argv)
 			fclose(f);
 			setenv("GTK_IM_MODULE_FILE", buf, 1);
 			setenv("GTK_IM_MODULE", "Maliit", 1);
+		}
+	}
+
+	/* Read the Lomiri theme file and select the app theme automatically */
+	snprintf(buf, sizeof(buf), "%s/.config/lomiri-ui-toolkit/theme.ini", home);
+	FILE *f = fopen(buf, "r");
+	if (f) {
+		char line[1024];
+		int dark_found = 0;
+
+		while (!dark_found && fgets(line, sizeof(line), f)) {
+			dark_found = strstr(line, "Dark") != NULL;
+		}
+
+		if (dark_found) {
+			setenv("GTK_THEME", "Adwaita:dark", 1);
 		}
 	}
 

@@ -17,9 +17,9 @@
     "libwebkit2gtk-4.1.so.0*"
   ],
   "install_root_data": [
-    "${BUILD_DIR}/squashfs-root/usr/bin/volla_messages",
-    "${BUILD_DIR}/squashfs-root/usr/share/icons/hicolor/256x256@2/apps/volla_messages.png",
+    "${BUILD_DIR}/usr/bin/volla_messages",
     "manifest.json",
+    "assets/volla-messages-icon.png",
     "volla-messages.desktop",
     "volla-messages.apparmor"
   ],
